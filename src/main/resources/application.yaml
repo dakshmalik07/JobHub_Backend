@@ -1,0 +1,4 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb+srv://vasu7yadav:44HO9DBfxk2Nle1V@cluster.kvj85.mongodb.net/Cluster?retryWrites=true&w=majority
