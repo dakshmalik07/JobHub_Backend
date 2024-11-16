@@ -25,7 +25,118 @@ public class LinkedInService {
     private static final String COOKIES_FILE_PATH = "C:/Users/vasu/OneDrive/Documents/My Projects/jobHub/jobHub/src/main/resources/cookies.dat";
 
 
-    //    public String scrapeLinkedIn(String keywords, String email) {
+        public String scrapeLinkedIn(String keywords, String email) {
+        System.setProperty("webdriver.chrome.driver", "C:/Users/vasu/OneDrive/Documents/My Projects/chromedriver.exe");
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--disable-blink-features=AutomationControlled");
+        options.addArguments("start-maximized");
+        options.addArguments("user-agent=" + getRandomUserAgent());
+        options.addArguments("--disable-gpu");
+        options.addArguments("--disable-infobars");
+        options.addArguments("--window-size=1920,1080");
+
+        WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
+
+        Set<String> uniqueEmails = new HashSet<>();
+        try {
+            driver.get("https://www.linkedin.com/login");
+
+            WebElement usernameField = driver.findElement(By.id("username"));
+            WebElement passwordField = driver.findElement(By.id("password"));
+            WebElement loginButton = driver.findElement(By.xpath("//button[contains(text(),'Sign in')]"));
+        usernameField.sendKeys("vasu.busatechlo@gmail.com");
+        passwordField.sendKeys("Vasubella123@");
+            loginButton.click();
+
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+            wait.until(ExpectedConditions.urlContains("feed"));
+
+            String searchUrl = "https://www.linkedin.com/search/results/content/?datePosted=%22past-24h%22&keywords=" + keywords + "&origin=FACETED_SEARCH&sortBy=%22date_posted%22";
+            driver.get(searchUrl);
+
+            int previousPostCount = 0;
+            int currentPostCount = 0;
+            int postLimit = 10;
+
+            do {
+                previousPostCount = currentPostCount;
+                List<WebElement> posts = driver.findElements(By.cssSelector("div.feed-shared-update-v2"));
+                currentPostCount += posts.size();
+
+
+                extractEmailsFromPosts(posts, uniqueEmails, driver);
+                if (currentPostCount >= postLimit) break;
+                scrollDown(driver);
+                randomDelay(500, 1500);
+
+            } while (currentPostCount > previousPostCount);
+
+            ScrapedData scrapedData = new ScrapedData();
+            scrapedData.setExtractedEmails(new ArrayList<>(uniqueEmails));
+            scrapedData.setKeywords(keywords);
+            scrapedData.setDateOfSearch(LocalDateTime.now().toString());
+            scrapedData.setUserEmail(email);
+            scrapedDataRepository.save(scrapedData);
+
+            return "Scraping successful, data saved.";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error occurred during scraping.";
+        } finally {
+            driver.quit();
+        }
+    }
+
+    private static void scrollDown(WebDriver driver) {
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+        js.executeScript("window.scrollBy(0,1000)");
+    }
+
+    private static void extractEmailsFromPosts(List<WebElement> posts, Set<String> uniqueEmails, WebDriver driver) {
+        Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+        for (WebElement post : posts) {
+            try {
+                WebElement moreButton = post.findElement(By.xpath(".//button[contains(@class, 'see-more')]"));
+
+                if (moreButton.isDisplayed()) {
+                    moreButton.click();
+                    randomDelay(500, 1000);
+                }
+
+                String postText = post.getText();
+                Matcher matcher = emailPattern.matcher(postText);
+                while (matcher.find()) {
+                    String email = matcher.group();
+                    uniqueEmails.add(email);
+                    System.out.println("Email found: " + email);
+                }
+            } catch (Exception e) {
+                System.err.println("An error occurred while extracting emails from post: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void randomDelay(int min, int max) throws InterruptedException {
+        Random random = new Random();
+        int delay = random.nextInt(max - min + 1) + min;
+        Thread.sleep(delay);
+    }
+
+    private static String getRandomUserAgent() {
+        String[] userAgents = {
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+                "Mozilla/5.0 (Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0"
+        };
+        Random random = new Random();
+        return userAgents[random.nextInt(userAgents.length)];
+    }
+//
+//
+//    public String scrapeLinkedIn(String keywords, String email) {
 //        System.setProperty("webdriver.chrome.driver", "C:/Users/vasu/OneDrive/Documents/My Projects/chromedriver.exe");
 //        ChromeOptions options = new ChromeOptions();
 //        options.addArguments("--disable-blink-features=AutomationControlled");
@@ -35,19 +146,27 @@ public class LinkedInService {
 //        options.addArguments("--disable-infobars");
 //        options.addArguments("--window-size=1920,1080");
 //
+////        String proxy = getNextProxy();
+////        if (proxy != null) {
+////            options.addArguments("--proxy-server=" + proxy);
+////            System.out.println("Using proxy: " + proxy);
+////        }
+//
 //        WebDriver driver = new ChromeDriver(options);
 //        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
 //
 //        Set<String> uniqueEmails = new HashSet<>();
-//        try {
-//            driver.get("https://www.linkedin.com/login");
+//        int postLimit = 10;
 //
-//            WebElement usernameField = driver.findElement(By.id("username"));
-//            WebElement passwordField = driver.findElement(By.id("password"));
-//            WebElement loginButton = driver.findElement(By.xpath("//button[contains(text(),'Sign in')]"));
-//            usernameField.sendKeys("vasu@bharatmandi.com");
-//            passwordField.sendKeys("Vasubella123@");
-//            loginButton.click();
+//        try {
+//            File cookieFile = new File(COOKIES_FILE_PATH);
+//            if (cookieFile.exists()) {
+//                loadCookies(driver);
+//                driver.get("https://www.linkedin.com/feed/");
+//            } else {
+//                loginToLinkedIn(driver);
+//                saveCookies(driver);
+//            }
 //
 //            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 //            wait.until(ExpectedConditions.urlContains("feed"));
@@ -57,27 +176,23 @@ public class LinkedInService {
 //
 //            int previousPostCount = 0;
 //            int currentPostCount = 0;
-//            int postLimit = 10;
 //
 //            do {
 //                previousPostCount = currentPostCount;
 //                List<WebElement> posts = driver.findElements(By.cssSelector("div.feed-shared-update-v2"));
 //                currentPostCount += posts.size();
 //
+//                extractEmailsFromPosts(posts, uniqueEmails);
 //
-//                extractEmailsFromPosts(posts, uniqueEmails, driver);
 //                if (currentPostCount >= postLimit) break;
 //                scrollDown(driver);
-//                randomDelay(500, 1500);
+//                randomDelay(45, 60);
 //
 //            } while (currentPostCount > previousPostCount);
 //
-//            ScrapedData scrapedData = new ScrapedData();
-//            scrapedData.setExtractedEmails(new ArrayList<>(uniqueEmails));
-//            scrapedData.setKeywords(keywords);
-//            scrapedData.setDateOfSearch(LocalDateTime.now().toString());
-//            scrapedData.setUserEmail(email);
-//            scrapedDataRepository.save(scrapedData);
+//            if (!uniqueEmails.isEmpty()) {
+//                saveEmailsToDatabase(uniqueEmails, keywords, email);
+//            }
 //
 //            return "Scraping successful, data saved.";
 //        } catch (Exception e) {
@@ -88,17 +203,50 @@ public class LinkedInService {
 //        }
 //    }
 //
+//    private void loginToLinkedIn(WebDriver driver) throws InterruptedException {
+//        driver.get("https://www.linkedin.com/login");
+//        WebElement usernameField = driver.findElement(By.id("username"));
+//        WebElement passwordField = driver.findElement(By.id("password"));
+//        WebElement loginButton = driver.findElement(By.xpath("//button[contains(text(),'Sign in')]"));
+//
+//        usernameField.sendKeys("vasu.busatechlo@gmail.com");
+//        passwordField.sendKeys("Vasubella123@");
+//        randomDelay(1000, 3000);
+//        loginButton.click();
+//    }
+//
+//    private void saveCookies(WebDriver driver) {
+//        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(COOKIES_FILE_PATH))) {
+//            Set<Cookie> cookies = driver.manage().getCookies();
+//            out.writeObject(cookies);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
+//
+//    private void loadCookies(WebDriver driver) {
+//        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(COOKIES_FILE_PATH))) {
+//            Set<Cookie> cookies = (Set<Cookie>) in.readObject();
+//            for (Cookie cookie : cookies) {
+//                driver.manage().addCookie(cookie);
+//            }
+//            driver.navigate().refresh();
+//        } catch (IOException | ClassNotFoundException e) {
+//            e.printStackTrace();
+//        }
+//    }
+//
 //    private static void scrollDown(WebDriver driver) {
 //        JavascriptExecutor js = (JavascriptExecutor) driver;
 //        js.executeScript("window.scrollBy(0,1000)");
 //    }
 //
-//    private static void extractEmailsFromPosts(List<WebElement> posts, Set<String> uniqueEmails, WebDriver driver) {
+//    public void extractEmailsFromPosts(List<WebElement> posts, Set<String> uniqueEmails) {
 //        Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+//
 //        for (WebElement post : posts) {
 //            try {
 //                WebElement moreButton = post.findElement(By.xpath(".//button[contains(@class, 'see-more')]"));
-//
 //                if (moreButton.isDisplayed()) {
 //                    moreButton.click();
 //                    randomDelay(500, 1000);
@@ -106,6 +254,7 @@ public class LinkedInService {
 //
 //                String postText = post.getText();
 //                Matcher matcher = emailPattern.matcher(postText);
+//
 //                while (matcher.find()) {
 //                    String email = matcher.group();
 //                    uniqueEmails.add(email);
@@ -117,11 +266,15 @@ public class LinkedInService {
 //        }
 //    }
 //
-//    private static void randomDelay(int min, int max) throws InterruptedException {
+//
+//    private static void randomDelay(int minSeconds, int maxSeconds) throws InterruptedException {
 //        Random random = new Random();
-//        int delay = random.nextInt(max - min + 1) + min;
+//        int minMillis = minSeconds * 1000;
+//        int maxMillis = maxSeconds * 1000;
+//        int delay = random.nextInt(maxMillis - minMillis + 1) + minMillis;
 //        Thread.sleep(delay);
 //    }
+//
 //
 //    private static String getRandomUserAgent() {
 //        String[] userAgents = {
@@ -136,167 +289,14 @@ public class LinkedInService {
 //    }
 //
 //
-    public String scrapeLinkedIn(String keywords, String email) {
-        System.setProperty("webdriver.chrome.driver", "C:/Users/vasu/OneDrive/Documents/My Projects/chromedriver.exe");
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--disable-blink-features=AutomationControlled");
-        options.addArguments("start-maximized");
-        options.addArguments("user-agent=" + getRandomUserAgent());
-        options.addArguments("--disable-gpu");
-        options.addArguments("--disable-infobars");
-        options.addArguments("--window-size=1920,1080");
-
-//        String proxy = getNextProxy();
-//        if (proxy != null) {
-//            options.addArguments("--proxy-server=" + proxy);
-//            System.out.println("Using proxy: " + proxy);
-//        }
-
-        WebDriver driver = new ChromeDriver(options);
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
-
-        Set<String> uniqueEmails = new HashSet<>();
-        int postLimit = 100;
-
-        try {
-            File cookieFile = new File(COOKIES_FILE_PATH);
-            if (cookieFile.exists()) {
-                loadCookies(driver);
-                driver.get("https://www.linkedin.com/feed/");
-            } else {
-                loginToLinkedIn(driver);
-                saveCookies(driver);
-            }
-
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-            wait.until(ExpectedConditions.urlContains("feed"));
-
-            String searchUrl = "https://www.linkedin.com/search/results/content/?datePosted=%22past-24h%22&keywords=" + keywords + "&origin=FACETED_SEARCH&sortBy=%22date_posted%22";
-            driver.get(searchUrl);
-
-            int previousPostCount = 0;
-            int currentPostCount = 0;
-
-            do {
-                previousPostCount = currentPostCount;
-                List<WebElement> posts = driver.findElements(By.cssSelector("div.feed-shared-update-v2"));
-                currentPostCount += posts.size();
-
-                extractEmailsFromPosts(posts, uniqueEmails);
-
-                if (currentPostCount >= postLimit) break;
-                scrollDown(driver);
-                randomDelay(45, 60);
-
-            } while (currentPostCount > previousPostCount);
-
-            if (!uniqueEmails.isEmpty()) {
-                saveEmailsToDatabase(uniqueEmails, keywords, email);
-            }
-
-            return "Scraping successful, data saved.";
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "Error occurred during scraping.";
-        } finally {
-            driver.quit();
-        }
-    }
-
-    private void loginToLinkedIn(WebDriver driver) throws InterruptedException {
-        driver.get("https://www.linkedin.com/login");
-        WebElement usernameField = driver.findElement(By.id("username"));
-        WebElement passwordField = driver.findElement(By.id("password"));
-        WebElement loginButton = driver.findElement(By.xpath("//button[contains(text(),'Sign in')]"));
-
-        usernameField.sendKeys("vasu.busatechlo@gmail.com");
-        passwordField.sendKeys("Vasubella123@");
-        randomDelay(1000, 3000);
-        loginButton.click();
-    }
-
-    private void saveCookies(WebDriver driver) {
-        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(COOKIES_FILE_PATH))) {
-            Set<Cookie> cookies = driver.manage().getCookies();
-            out.writeObject(cookies);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void loadCookies(WebDriver driver) {
-        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(COOKIES_FILE_PATH))) {
-            Set<Cookie> cookies = (Set<Cookie>) in.readObject();
-            for (Cookie cookie : cookies) {
-                driver.manage().addCookie(cookie);
-            }
-            driver.navigate().refresh();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void scrollDown(WebDriver driver) {
-        JavascriptExecutor js = (JavascriptExecutor) driver;
-        js.executeScript("window.scrollBy(0,1000)");
-    }
-
-    public void extractEmailsFromPosts(List<WebElement> posts, Set<String> uniqueEmails) {
-        Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
-
-        for (WebElement post : posts) {
-            try {
-                WebElement moreButton = post.findElement(By.xpath(".//button[contains(@class, 'see-more')]"));
-                if (moreButton.isDisplayed()) {
-                    moreButton.click();
-                    randomDelay(500, 1000);
-                }
-
-                String postText = post.getText();
-                Matcher matcher = emailPattern.matcher(postText);
-
-                while (matcher.find()) {
-                    String email = matcher.group();
-                    uniqueEmails.add(email);
-                    System.out.println("Email found: " + email);
-                }
-            } catch (Exception e) {
-                System.err.println("An error occurred while extracting emails from post: " + e.getMessage());
-            }
-        }
-    }
-
-
-    private static void randomDelay(int minSeconds, int maxSeconds) throws InterruptedException {
-        Random random = new Random();
-        int minMillis = minSeconds * 1000;
-        int maxMillis = maxSeconds * 1000;
-        int delay = random.nextInt(maxMillis - minMillis + 1) + minMillis;
-        Thread.sleep(delay);
-    }
-
-
-    private static String getRandomUserAgent() {
-        String[] userAgents = {
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
-                "Mozilla/5.0 (Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0"
-        };
-        Random random = new Random();
-        return userAgents[random.nextInt(userAgents.length)];
-    }
-
-
-    public void saveEmailsToDatabase(Set<String> emails, String keywords, String userEmail) {
-        ScrapedData scrapedData = new ScrapedData();
-        scrapedData.setExtractedEmails(new ArrayList<>(emails));
-        scrapedData.setKeywords(keywords);
-        scrapedData.setDateOfSearch(LocalDateTime.now().toString());
-        scrapedData.setUserEmail(userEmail);
-        scrapedDataRepository.save(scrapedData);
-    }
+//    public void saveEmailsToDatabase(Set<String> emails, String keywords, String userEmail) {
+//        ScrapedData scrapedData = new ScrapedData();
+//        scrapedData.setExtractedEmails(new ArrayList<>(emails));
+//        scrapedData.setKeywords(keywords);
+//        scrapedData.setDateOfSearch(LocalDateTime.now().toString());
+//        scrapedData.setUserEmail(userEmail);
+//        scrapedDataRepository.save(scrapedData);
+//    }
 
 
     //    private static String getNextProxy() {
